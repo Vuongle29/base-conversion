@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chuyển đổi cơ số</title>
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#f3f1ec; --surface:#ffffff; --ink:#1c2321; --muted:#5b6662; --line:#d6d9d3;
+  --accent:#1f6f5c; --accent-ink:#ffffff; --err:#b3261e;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a18; --surface:#1d2523; --ink:#e8ede9; --muted:#9aa7a1; --line:#33403c;
+    --accent:#58c1a4; --accent-ink:#0c1a16; --err:#ff8a80;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a18; --surface:#1d2523; --ink:#e8ede9; --muted:#9aa7a1; --line:#33403c;
+  --accent:#58c1a4; --accent-ink:#0c1a16; --err:#ff8a80;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:28px 18px 48px}
+h1{font:600 1.7rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 6px}
+p.lead{margin:0 0 20px;color:var(--muted)}
+ul.out{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.out li{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.out li.err{border-color:var(--err)}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px}
+label{font-weight:600}
+label small{font-weight:400;color:var(--muted);margin-left:6px;font-size:.8rem}
+.msg{font-size:.8rem;color:var(--err);min-height:0}
+.line{display:flex;gap:8px}
+input{flex:1;min-width:0;font:1.05rem ui-monospace,Consolas,Menlo,monospace;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+li.active input{border-color:var(--accent)}
+button{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.done{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sub{font-size:.82rem;color:var(--muted);margin-top:6px;font-family:ui-monospace,Consolas,Menlo,monospace}
+.note{margin-top:20px;font-size:.88rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Chuyển đổi cơ số</h1>
+  <p class="lead">Gõ vào ô của bất kỳ cơ số nào, các ô còn lại tự cập nhật theo.</p>
+  <ul class="out" id="out"></ul>
+  <p class="note">Chữ số: cơ số 12 dùng 0–9, A, B; cơ số 16 dùng 0–9, A–F; cơ số 60 dùng 0–9, A–Z rồi a–x (phân biệt chữ hoa và chữ thường). Hỗ trợ số nguyên rất lớn và số âm (thêm dấu trừ ở đầu).</p>
+</main>
+<script>
+(function(){
+  var BASES=[10,16,2,8,4,12,60];
+  var NAMES={2:"nhị phân",4:"tứ phân",8:"bát phân",10:"thập phân",12:"thập nhị phân",16:"thập lục phân",60:"lục thập phân"};
+  var DIG="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  var out=document.getElementById("out"), rows={};
+
+  function parse(s,b){
+    var neg=false; s=s.replace(/[\s_,]/g,"");
+    if(s==="-"||!s) return null;
+    if(s[0]==="-"){neg=true;s=s.slice(1);}
+    var v=0n,B=BigInt(b);
+    for(var i=0;i<s.length;i++){
+      var c=s[i], d=b<=36?DIG.indexOf(c.toUpperCase()):DIG.indexOf(c);
+      if(d<0||d>=b) return {bad:c};
+      v=v*B+BigInt(d);
+    }
+    return {v:neg?-v:v};
+  }
+  function fmt(v,b){
+    if(v===0n) return "0";
+    var neg=v<0n; if(neg) v=-v;
+    var B=BigInt(b),r="";
+    while(v>0n){r=DIG[Number(v%B)]+r;v=v/B;}
+    return (neg?"-":"")+r;
+  }
+  function groups60(v){
+    if(v===0n) return "0";
+    var neg=v<0n; if(neg) v=-v;
+    var a=[]; while(v>0n){a.unshift(String(v%60n));v=v/60n;}
+    return (neg?"-":"")+a.join(" : ");
+  }
+  function update(src){
+    var r=rows[src], p=parse(r.input.value,src);
+    BASES.forEach(function(b){rows[b].li.classList.toggle("active",b===src);});
+    if(p&&p.bad!==undefined){
+      r.li.classList.add("err");
+      r.msg.textContent="Ký tự \u201c"+p.bad+"\u201d không hợp lệ trong cơ số "+src+".";
+      return;
+    }
+    r.li.classList.remove("err"); r.msg.textContent="";
+    BASES.forEach(function(b){
+      if(b===src) return;
+      rows[b].li.classList.remove("err"); rows[b].msg.textContent="";
+      rows[b].input.value=p?fmt(p.v,b):"";
+    });
+    rows[60].sub.textContent=p?"Dạng các nhóm: "+groups60(p.v):"";
+  }
+  BASES.forEach(function(b){
+    var li=document.createElement("li");
+    li.innerHTML='<div class="top"><label for="b'+b+'">Cơ số '+b+'<small>'+NAMES[b]+'</small></label><span class="msg" role="alert"></span></div>'+
+      '<div class="line"><input id="b'+b+'" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button">Sao chép</button></div>'+
+      (b===60?'<div class="sub"></div>':'');
+    var input=li.querySelector("input"), btn=li.querySelector("button");
+    rows[b]={li:li,input:input,msg:li.querySelector(".msg"),sub:li.querySelector(".sub")};
+    input.addEventListener("input",function(){update(b);});
+    btn.addEventListener("click",function(){
+      try{navigator.clipboard.writeText(input.value).then(function(){
+        btn.textContent="Đã chép";btn.classList.add("done");
+        setTimeout(function(){btn.textContent="Sao chép";btn.classList.remove("done");},1200);
+      },function(){});}catch(e){}
+    });
+    out.appendChild(li);
+  });
+  rows[10].input.value="255"; update(10);
+})();
+</script>
+</body>
+</html>
